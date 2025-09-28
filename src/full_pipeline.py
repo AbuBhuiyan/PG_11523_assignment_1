@@ -9,6 +9,8 @@ import os
 import geopandas as gpd
 import plotly.express as px
 import joblib
+import sys
+import os
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, LogisticRegression
@@ -22,9 +24,13 @@ from sklearn.neural_network import MLPClassifier
 # -------------------------
 # Command-line arguments
 # -------------------------
-input_file = sys.argv[1]    # raw dataset CSV
-output_dir = sys.argv[2]    # directory to save results
-os.makedirs(output_dir, exist_ok=True)
+input_file = sys.argv[1]
+results_dir = sys.argv[2]
+models_dir = sys.argv[3]
+
+# Create folders if they don't exist
+os.makedirs(results_dir, exist_ok=True)
+os.makedirs(models_dir, exist_ok=True)
 
 # -------------------------
 # Load dataset
@@ -37,8 +43,8 @@ restaurant_data = pd.read_csv(input_file)
 # ===============================
 # Quick Overview
 # ===============================
-restaurant_data.describe().to_csv(f"{output_dir}/data_summary.csv")
-restaurant_data.isnull().sum().to_csv(f"{output_dir}/missing_values.csv")
+restaurant_data.describe().to_csv(f"{results_dir}/data_summary.csv")
+restaurant_data.isnull().sum().to_csv(f"{results_dir}/missing_values.csv")
 
 # ===============================
 # Handle Missing / Invalid Data
@@ -51,13 +57,13 @@ restaurant_data['rating_text'].fillna("Unrated", inplace=True)
 restaurant_data['rating_number'].fillna(0, inplace=True)
 restaurant_data['votes'].fillna(0, inplace=True)
 restaurant_data['type'].fillna("Unknown", inplace=True)
-restaurant_data.to_csv(f"{output_dir}/processed.csv", index=False)
+restaurant_data.to_csv(f"{results_dir}/processed.csv", index=False)
 
-# ===============================
+# =============================== 
 # EDA Plots
 # ===============================
 def save_plot(fig, name):
-    plt.savefig(f"{output_dir}/{name}.png", bbox_inches="tight")
+    plt.savefig(f"{results_dir}/{name}.png", bbox_inches="tight")
     plt.close()
 
 # Cost distribution
@@ -105,7 +111,7 @@ g.set_titles("{col_name} Rating")
 g.set_axis_labels("Cost (AUD)", "Count")
 plt.subplots_adjust(top=0.85)
 g.fig.suptitle("Distribution of Restaurant Costs by Rating", fontsize=16)
-g.savefig(f"{output_dir}/cost_by_rating.png")
+g.savefig(f"{results_dir}/cost_by_rating.png")
 plt.close()
 
 # Static boxplot
@@ -120,7 +126,7 @@ save_plot(plt, "cost_boxplot_by_rating")
 fig = px.box(restaurant_data, x='rating_text', y='cost',
              category_orders={'rating_text': ['Poor','Average','Good','Very Good','Excellent']},
              title="Interactive Restaurant Cost by Rating")
-fig.write_html(f"{output_dir}/interactive_cost_boxplot.html")
+fig.write_html(f"{results_dir}/interactive_cost_boxplot.html")
 
 # ===============================
 # Geospatial Analysis (Japanese example)
@@ -139,10 +145,11 @@ try:
                 legend_kwds={'label': f"{selected_cuisine} restaurants per suburb"}, ax=ax)
     ax.set_title(f"Density of {selected_cuisine} Restaurants in Sydney", fontsize=16)
     ax.axis("off")
-    plt.savefig(f"{output_dir}/{selected_cuisine}_choropleth.png")
+    plt.savefig(f"{results_dir}/{selected_cuisine}_choropleth.png")
     plt.close()
 except Exception as e:
     print("Geospatial plot skipped:", e)
+
 
 # ===============================
 # Regression Modeling
@@ -159,11 +166,11 @@ X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_reg, test_size=0
 reg_model = LinearRegression().fit(X_train, y_train)
 y_pred = reg_model.predict(X_test)
 mse = mean_squared_error(y_test, y_pred)
-pd.DataFrame({"MSE":[mse]}).to_csv(f"{output_dir}/regression_results.csv", index=False)
+pd.DataFrame({"MSE": [mse]}).to_csv(os.path.join(results_dir, "regression_results.csv"), index=False)
 
 # Save regression model + scaler
-joblib.dump(reg_model, "models/regression_model.pkl")
-joblib.dump(scaler, "models/regression_scaler.pkl")
+joblib.dump(reg_model, os.path.join(models_dir, "regression_model.pkl"))
+joblib.dump(scaler, os.path.join(models_dir, "regression_scaler.pkl"))
 
 # ===============================
 # Classification Modeling
@@ -186,7 +193,7 @@ for name, model in models.items():
     y_pred = model.predict(X_test)
     
     # Save each classification model
-    joblib.dump(model, f"models/{name}_model.pkl")
+    joblib.dump(model, os.path.join(models_dir, f"{name}_model.pkl"))
     
     results.append({
         "Model": name,
@@ -195,5 +202,4 @@ for name, model in models.items():
         "Recall": recall_score(y_test, y_pred),
         "F1": f1_score(y_test, y_pred)
     })
-
-pd.DataFrame(results).to_csv(f"{output_dir}/classification_results.csv", index=False)
+pd.DataFrame(results).to_csv(os.path.join(results_dir, "classification_results.csv"), index=False)
