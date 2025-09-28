@@ -7,3 +7,6 @@ __pycache__/
 *.html 
 .DS_Store 
 .env 
+
+results/
+models/
