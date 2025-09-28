@@ -34,7 +34,7 @@ cd PG_11523_assignment_1
 pip install -r requirements.txt
 
 3. Run Full Pipeline
-python src/full_pipeline.py data/zomato_df_final_data.csv results/
+python src\full_pipeline.py data\zomato_df_final_data.csv results models
 
 This will:
 
