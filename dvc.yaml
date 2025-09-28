@@ -1,0 +1,12 @@
+stages:
+  run_full_pipeline:
+    cmd: python src/full_pipeline.py data/zomato_df_final_data.csv results/
+    deps:
+      - src/full_pipeline.py
+      - data/zomato_df_final_data.csv
+    outs:
+      - results/
+      - models/
+
+
+
