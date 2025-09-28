@@ -1,5 +1,0 @@
-outs:
-- md5: ee6da2ea11f688405eedaafa1e6e1e15
-  size: 24
-  hash: md5
-  path: regression_results.csv
