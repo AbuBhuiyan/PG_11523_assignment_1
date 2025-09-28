@@ -179,14 +179,45 @@ X_train, X_test, y_train, y_test = train_test_split(
     X_scaled, y_reg, test_size=0.2, random_state=SEED
 )
 
+# Model A: Linear Regression
 reg_model = LinearRegression().fit(X_train, y_train)
 y_pred = reg_model.predict(X_test)
-mse = mean_squared_error(y_test, y_pred)
-pd.DataFrame({"MSE": [mse]}).to_csv(os.path.join(results_dir, "regression_results.csv"), index=False)
+mse_lr = mean_squared_error(y_test, y_pred)
 
-# Save regression model + scaler
+# Save Linear Regression model + scaler
 joblib.dump(reg_model, os.path.join(models_dir, "regression_model.pkl"))
 joblib.dump(scaler, os.path.join(models_dir, "regression_scaler.pkl"))
+
+# Model B: Gradient Descent Regression
+def gradient_descent(X, y, lr=0.01, n_iter=1000):
+    m, n = X.shape
+    theta = np.zeros(n)
+    bias = 0.0
+    for _ in range(n_iter):
+        y_pred = X.dot(theta) + bias
+        error = y_pred - y
+        d_theta = (1/m) * X.T.dot(error)
+        d_bias = (1/m) * np.sum(error)
+        theta -= lr * d_theta
+        bias -= lr * d_bias
+    return theta, bias
+
+theta, bias = gradient_descent(X_train, y_train, lr=0.01, n_iter=1000)
+y_pred_gd = X_test.dot(theta) + bias
+mse_gd = mean_squared_error(y_test, y_pred_gd)
+
+# Save Gradient Descent model (just parameters)
+joblib.dump({"theta": theta, "bias": bias, "scaler": scaler}, os.path.join(models_dir, "gradient_descent_model.pkl"))
+
+# Save both regression results in a single CSV
+reg_results = pd.DataFrame([
+    {"Model": "LinearRegression", "MSE": mse_lr},
+    {"Model": "GradientDescentRegression", "MSE": mse_gd}
+])
+reg_results.to_csv(os.path.join(results_dir, "regression_results.csv"), index=False)
+
+print(f"Model A - Linear Regression MSE: {mse_lr:.4f}")
+print(f"Model B - Gradient Descent Regression MSE: {mse_gd:.4f}")
 
 # ===============================
 # Classification Modeling
