@@ -8,6 +8,7 @@ import sys
 import os
 import geopandas as gpd
 import plotly.express as px
+import joblib
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, LogisticRegression
@@ -146,15 +147,23 @@ except Exception as e:
 # ===============================
 # Regression Modeling
 # ===============================
+# ===============================
+# Regression Modeling
+# ===============================
 X = restaurant_data[['votes','cost']]
 y_reg = restaurant_data['rating_number']
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_reg, test_size=0.2, random_state=42)
+
 reg_model = LinearRegression().fit(X_train, y_train)
 y_pred = reg_model.predict(X_test)
 mse = mean_squared_error(y_test, y_pred)
 pd.DataFrame({"MSE":[mse]}).to_csv(f"{output_dir}/regression_results.csv", index=False)
+
+# Save regression model + scaler
+joblib.dump(reg_model, "models/regression_model.pkl")
+joblib.dump(scaler, "models/regression_scaler.pkl")
 
 # ===============================
 # Classification Modeling
@@ -175,6 +184,10 @@ results = []
 for name, model in models.items():
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
+    
+    # Save each classification model
+    joblib.dump(model, f"models/{name}_model.pkl")
+    
     results.append({
         "Model": name,
         "Accuracy": accuracy_score(y_test, y_pred),
