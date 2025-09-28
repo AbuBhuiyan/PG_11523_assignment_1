@@ -1,5 +1,7 @@
 # src/full_pipeline.py
 
+# src/full_pipeline.py
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,17 +11,22 @@ import os
 import geopandas as gpd
 import plotly.express as px
 import joblib
-import sys
-import os
+import random
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import mean_squared_error, confusion_matrix, precision_score, recall_score, f1_score, accuracy_score
+from sklearn.metrics import mean_squared_error, precision_score, recall_score, f1_score, accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
+
+# -------------------------
+# Reproducibility Seed
+# -------------------------
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
 
 # -------------------------
 # Command-line arguments
@@ -51,7 +58,9 @@ restaurant_data.isnull().sum().to_csv(f"{results_dir}/missing_values.csv")
 # ===============================
 median_cost = restaurant_data['cost'].median()
 restaurant_data['cost'].fillna(median_cost, inplace=True)
-restaurant_data['cost_2'].fillna(median_cost / restaurant_data['cost'].median() * restaurant_data['cost_2'].median(), inplace=True)
+restaurant_data['cost_2'].fillna(
+    median_cost / restaurant_data['cost'].median() * restaurant_data['cost_2'].median(), inplace=True
+)
 restaurant_data.dropna(subset=['lat','lng'], inplace=True)
 restaurant_data['rating_text'].fillna("Unrated", inplace=True)
 restaurant_data['rating_number'].fillna(0, inplace=True)
@@ -59,7 +68,7 @@ restaurant_data['votes'].fillna(0, inplace=True)
 restaurant_data['type'].fillna("Unknown", inplace=True)
 restaurant_data.to_csv(f"{results_dir}/processed.csv", index=False)
 
-# =============================== 
+# ===============================
 # EDA Plots
 # ===============================
 def save_plot(fig, name):
@@ -104,9 +113,11 @@ plt.title("Top 3 Suburbs with Most Restaurants")
 save_plot(plt, "top_suburbs")
 
 # Cost vs Rating (Poor/Excellent)
-g = sns.FacetGrid(restaurant_data, col="rating_text", col_order=['Poor', 'Excellent'],
-                  col_wrap=2, height=4, sharex=True, sharey=True)
-g.map(sns.histplot, "cost", bins=15, color="skyblue")
+g = sns.FacetGrid(
+    restaurant_data, col="rating_text", col_order=['Poor', 'Excellent'],
+    col_wrap=2, height=4, sharex=True, sharey=True
+)
+g.map_dataframe(sns.histplot, x="cost", bins=15, color="skyblue")
 g.set_titles("{col_name} Rating")
 g.set_axis_labels("Cost (AUD)", "Count")
 plt.subplots_adjust(top=0.85)
@@ -116,16 +127,20 @@ plt.close()
 
 # Static boxplot
 plt.figure(figsize=(10,6))
-sns.boxplot(x='rating_text', y='cost', data=restaurant_data,
-            order=['Poor','Average','Good','Very Good','Excellent'], palette="Set2")
+sns.boxplot(
+    x='rating_text', y='cost', data=restaurant_data,
+    order=['Poor','Average','Good','Very Good','Excellent'], palette="Set2"
+)
 plt.title("Restaurant Cost by Rating")
 plt.xticks(rotation=30)
 save_plot(plt, "cost_boxplot_by_rating")
 
 # Interactive plot (Plotly)
-fig = px.box(restaurant_data, x='rating_text', y='cost',
-             category_orders={'rating_text': ['Poor','Average','Good','Very Good','Excellent']},
-             title="Interactive Restaurant Cost by Rating")
+fig = px.box(
+    restaurant_data, x='rating_text', y='cost',
+    category_orders={'rating_text': ['Poor','Average','Good','Very Good','Excellent']},
+    title="Interactive Restaurant Cost by Rating"
+)
 fig.write_html(f"{results_dir}/interactive_cost_boxplot.html")
 
 # ===============================
@@ -141,8 +156,10 @@ try:
     merged = gdf.merge(cuisine_map, left_on="SSC_NAME", right_on="subzone", how="left")
     merged['count'] = merged['count'].fillna(0)
     fig, ax = plt.subplots(figsize=(12,10))
-    merged.plot(column="count", cmap="OrRd", linewidth=0.8, edgecolor="grey", legend=True,
-                legend_kwds={'label': f"{selected_cuisine} restaurants per suburb"}, ax=ax)
+    merged.plot(
+        column="count", cmap="OrRd", linewidth=0.8, edgecolor="grey", legend=True,
+        legend_kwds={'label': f"{selected_cuisine} restaurants per suburb"}, ax=ax
+    )
     ax.set_title(f"Density of {selected_cuisine} Restaurants in Sydney", fontsize=16)
     ax.axis("off")
     plt.savefig(f"{results_dir}/{selected_cuisine}_choropleth.png")
@@ -150,10 +167,6 @@ try:
 except Exception as e:
     print("Geospatial plot skipped:", e)
 
-
-# ===============================
-# Regression Modeling
-# ===============================
 # ===============================
 # Regression Modeling
 # ===============================
@@ -161,7 +174,10 @@ X = restaurant_data[['votes','cost']]
 y_reg = restaurant_data['rating_number']
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_reg, test_size=0.2, random_state=42)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y_reg, test_size=0.2, random_state=SEED
+)
 
 reg_model = LinearRegression().fit(X_train, y_train)
 y_pred = reg_model.predict(X_test)
@@ -177,24 +193,24 @@ joblib.dump(scaler, os.path.join(models_dir, "regression_scaler.pkl"))
 # ===============================
 restaurant_data['high_rated'] = (restaurant_data['rating_number']>=4).astype(int)
 y_clf = restaurant_data['high_rated']
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_clf, test_size=0.2, random_state=42)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y_clf, test_size=0.2, random_state=SEED
+)
 
 models = {
-    "LogisticRegression": LogisticRegression(max_iter=1000),
-    "RandomForest": RandomForestClassifier(n_estimators=100, random_state=42),
-    "GradientBoosting": GradientBoostingClassifier(random_state=42),
-    "SVM": SVC(probability=True, random_state=42),
-    "MLP": MLPClassifier(max_iter=500, random_state=42)
+    "LogisticRegression": LogisticRegression(max_iter=1000, random_state=SEED),
+    "RandomForest": RandomForestClassifier(n_estimators=100, random_state=SEED),
+    "GradientBoosting": GradientBoostingClassifier(random_state=SEED),
+    "SVM": SVC(probability=True, random_state=SEED),
+    "MLP": MLPClassifier(max_iter=500, random_state=SEED)
 }
 
 results = []
 for name, model in models.items():
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    
-    # Save each classification model
     joblib.dump(model, os.path.join(models_dir, f"{name}_model.pkl"))
-    
     results.append({
         "Model": name,
         "Accuracy": accuracy_score(y_test, y_pred),
@@ -202,4 +218,5 @@ for name, model in models.items():
         "Recall": recall_score(y_test, y_pred),
         "F1": f1_score(y_test, y_pred)
     })
+
 pd.DataFrame(results).to_csv(os.path.join(results_dir, "classification_results.csv"), index=False)
